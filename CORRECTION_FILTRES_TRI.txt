@@ -1,0 +1,2 @@
+Correction appliquée : filtres chien/affixe fonctionnels, tri des colonnes renforcé, événements input/change ajoutés, filtres du graphique annuel activés, export years corrigé.
+Remplacer l'ancien dossier Render par ce dossier ou republier le dépôt avec ces fichiers.
