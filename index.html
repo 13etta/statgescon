@@ -118,140 +118,19 @@ const safe = v => (v===null||v===undefined)?'':String(v);
 function initTabs(){const nav=document.getElementById('tabs');nav.innerHTML=tabs.map(([id,l],i)=>`<button class="tab ${i?'':'active'}" data-id="${id}">${l}</button>`).join('');nav.onclick=e=>{if(!e.target.classList.contains('tab'))return;document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));e.target.classList.add('active');document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.getElementById(e.target.dataset.id).classList.add('active')}}
 function kpis(){const s=DATA.summary;document.getElementById('dateRange').textContent=`Période étudiée : ${s.date_min} → ${s.date_max}`; const cards=[['Présentations',s.presentations,'base chiens identifiés'],['Chiens',s.dogs,`${s.dog_names} noms normalisés`],['Résultats',s.results, pct(s.rate)],['Points',s.points,'score standardisé cumulé'],['Disciplines',s.disciplines,'catégories de terrain'],['Lignes isolées',s.excluded_rows,'non rattachées à un chien']];document.getElementById('kpis').innerHTML=cards.map(c=>`<div class="card"><div class="kpi-label">${c[0]}</div><div class="kpi-val">${fmt.format(c[1])}</div><div class="kpi-sub">${c[2]}</div></div>`).join('')}
 function bars(el, rows, label, value, maxRows=12, valueFmt=v=>fmt.format(v)){rows=rows.slice(0,maxRows);const max=Math.max(...rows.map(r=>+r[value]||0),1);document.getElementById(el).innerHTML=rows.map(r=>`<div class="barrow"><div class="barlabel" title="${safe(r[label])}">${safe(r[label])}</div><div class="bartrack"><div class="barfill" style="width:${((+r[value]||0)/max*100).toFixed(1)}%"></div></div><div class="num">${valueFmt(r[value])}</div></div>`).join('')}
-function makeTable(el, rows, cols, opts={}){
-  let sortKey=opts.sortKey||cols[0][0], sortDir=opts.sortDir||-1;
-  const container=document.getElementById(el);
-  function getComparable(v){
-    if(v===null||v===undefined) return '';
-    if(typeof v==='number') return v;
-    const s=String(v).trim().replace(',', '.');
-    if(s!=='' && !Number.isNaN(Number(s))) return Number(s);
-    return String(v);
-  }
-  function render(){
-    const predicate = opts.filter ? opts.filter() : null;
-    let r = predicate ? rows.filter(predicate) : rows.slice();
-    r.sort((a,b)=>{
-      let va=getComparable(a[sortKey]), vb=getComparable(b[sortKey]);
-      if(typeof va==='number' || typeof vb==='number') return ((Number(va)||0)-(Number(vb)||0))*sortDir;
-      return String(va).localeCompare(String(vb),'fr',{numeric:true,sensitivity:'base'})*sortDir;
-    });
-    if(opts.limit) r=r.slice(0,opts.limit);
-    const head='<thead><tr>'+cols.map(c=>`<th data-k="${c[0]}" title="Cliquer pour trier">${c[1]}${sortKey===c[0] ? (sortDir===1?' ▲':' ▼') : ''}</th>`).join('')+'</tr></thead>';
-    const body='<tbody>'+r.map((row,i)=>'<tr>'+cols.map(c=>{
-      let raw=row[c[0]], v=raw;
-      let cls=(typeof raw==='number'||c[2]==='num'||c[2]==='pct')?'num':'';
-      if(c[2]==='pct') v=pct(raw);
-      else if(c[2]==='num') v=num(raw);
-      else if(c[2]==='int') {v=fmt.format(raw||0);cls='num'};
-      if(c[2]==='profile') v=`<span class="pill ${safe(raw).includes('élite')||safe(raw).includes('efficace')?'good':safe(raw).includes('coup')?'warn':safe(raw).includes('peu concluant')?'bad':''}">${safe(raw)}</span>`;
-      else if(typeof v !== 'number') v=safe(v);
-      return `<td class="${cls}">${v}</td>`
-    }).join('')+'</tr>').join('')+'</tbody>';
-    const empty = r.length ? '' : `<p class="small" style="padding:14px">Aucun résultat pour ce filtre.</p>`;
-    container.innerHTML='<table>'+head+body+'</table>'+empty;
-    container.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1}; render()});
-  }
-  render();
-  return {render};
-}
+function makeTable(el, rows, cols, opts={}){let sortKey=opts.sortKey||cols[0][0], sortDir=opts.sortDir||-1; const container=document.getElementById(el); function render(){let r=opts.filter?rows.filter(opts.filter):rows.slice(); r.sort((a,b)=>{let va=a[sortKey],vb=b[sortKey]; if(typeof va==='number'||typeof vb==='number') return ((+va||0)-(+vb||0))*sortDir; return safe(va).localeCompare(safe(vb),'fr')*sortDir}); if(opts.limit) r=r.slice(0,opts.limit); const head='<thead><tr>'+cols.map(c=>`<th data-k="${c[0]}">${c[1]}</th>`).join('')+'</tr></thead>'; const body='<tbody>'+r.map((row,i)=>'<tr>'+cols.map(c=>{let v=row[c[0]];let cls=(typeof v==='number'||c[2]==='num'||c[2]==='pct')?'num':''; if(c[2]==='pct') v=pct(v); else if(c[2]==='num') v=num(v); else if(c[2]==='int') {v=fmt.format(v||0);cls='num'}; if(c[2]==='profile') v=`<span class="pill ${safe(v).includes('élite')||safe(v).includes('efficace')?'good':safe(v).includes('coup')?'warn':safe(v).includes('peu concluant')?'bad':''}">${safe(v)}</span>`; return `<td class="${cls}">${v}</td>`}).join('')+'</tr>').join('')+'</tbody>'; container.innerHTML='<table>'+head+body+'</table>'; container.querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(sortKey===k) sortDir*=-1; else {sortKey=k; sortDir=-1}; render()}) } render(); return {render}; }
 function unique(arr,key){return [...new Set(arr.flatMap(r=>safe(r[key]).split(',').map(x=>x.trim())).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'))}
 function optionize(id, label, vals){document.getElementById(id).innerHTML=`<option value="">${label}</option>`+vals.map(v=>`<option>${v}</option>`).join('')}
 let dogTable, affTable;
-function initDogTable(){optionize('dogDiscipline','Toutes disciplines', unique(DATA.dogs,'disciplines')); optionize('dogProfile','Tous profils',[...new Set(DATA.dogs.map(r=>r.profil_statistique))].sort()); optionize('dogAffixe','Tous affixes',[...new Set(DATA.dogs.map(r=>r.affixe))].sort((a,b)=>a.localeCompare(b,'fr')).slice(0,500)); const filter=()=>{const q=safe(document.getElementById('dogSearch').value).toLowerCase();const d=document.getElementById('dogDiscipline').value;const p=document.getElementById('dogProfile').value;const a=document.getElementById('dogAffixe').value;return r=>(!q||safe(Object.values(r).join(' ')).toLowerCase().includes(q))&&(!d||safe(r.disciplines).includes(d))&&(!p||r.profil_statistique===p)&&(!a||r.affixe===a)}; const cols=[['nom_chien_affiche','Chien'],['identifiant','ID'],['affixe','Affixe'],['presentations','Prés.','int'],['resultats','Rés.','int'],['taux_resultat','Taux','pct'],['points','Pts','int'],['score_moyen_presentation','Score moy.','num'],['haut_niveau','HN','int'],['CACIT','CACIT','int'],['CACT','CACT','int'],['EXC','EXC','int'],['discipline_forte','Discipline forte'],['fiabilite_volume','Fiabilité'],['profil_statistique','Profil','profile']]; dogTable=makeTable('dogTable', DATA.dogs, cols, {sortKey:'indice_performance', sortDir:-1, filter}); ['dogSearch','dogDiscipline','dogProfile','dogAffixe'].forEach(id=>{const el=document.getElementById(id); ['input','change'].forEach(evt=>el.addEventListener(evt,()=>dogTable.render()));});
+function initDogTable(){optionize('dogDiscipline','Toutes disciplines', unique(DATA.dogs,'disciplines')); optionize('dogProfile','Tous profils',[...new Set(DATA.dogs.map(r=>r.profil_statistique))].sort()); optionize('dogAffixe','Tous affixes',[...new Set(DATA.dogs.map(r=>r.affixe))].sort((a,b)=>a.localeCompare(b,'fr')).slice(0,500)); const filter=()=>{const q=safe(document.getElementById('dogSearch').value).toLowerCase();const d=document.getElementById('dogDiscipline').value;const p=document.getElementById('dogProfile').value;const a=document.getElementById('dogAffixe').value;return r=>(!q||safe(Object.values(r).join(' ')).toLowerCase().includes(q))&&(!d||safe(r.disciplines).includes(d))&&(!p||r.profil_statistique===p)&&(!a||r.affixe===a)}; const cols=[['nom_chien_affiche','Chien'],['identifiant','ID'],['affixe','Affixe'],['presentations','Prés.','int'],['resultats','Rés.','int'],['taux_resultat','Taux','pct'],['points','Pts','int'],['score_moyen_presentation','Score moy.','num'],['haut_niveau','HN','int'],['CACIT','CACIT','int'],['CACT','CACT','int'],['EXC','EXC','int'],['discipline_forte','Discipline forte'],['fiabilite_volume','Fiabilité'],['profil_statistique','Profil','profile']]; dogTable=makeTable('dogTable', DATA.dogs, cols, {sortKey:'indice_performance', sortDir:-1, filter}); ['dogSearch','dogDiscipline','dogProfile','dogAffixe'].forEach(id=>document.getElementById(id).addEventListener('input',()=>dogTable.render()));
 makeTable('tableTopVolume',DATA.topVolume,[['nom_chien_affiche','Chien'],['presentations','Prés.','int'],['resultats','Rés.','int'],['points','Pts','int']],{sortKey:'presentations',limit:15}); makeTable('tableTopRate10',DATA.topRate10,[['nom_chien_affiche','Chien'],['presentations','Prés.','int'],['taux_resultat','Taux','pct'],['points','Pts','int']],{sortKey:'taux_resultat',limit:15}); makeTable('tableTopScore10',DATA.topScoreAvg10,[['nom_chien_affiche','Chien'],['presentations','Prés.','int'],['score_moyen_presentation','Score moy.','num'],['points','Pts','int']],{sortKey:'score_moyen_presentation',limit:15});}
-function initAffTable(){optionize('affReliability','Toutes fiabilités',[...new Set(DATA.affixes.map(r=>r.fiabilite))].sort()); const filter=()=>{const q=safe(document.getElementById('affSearch').value).toLowerCase();const f=document.getElementById('affReliability').value;return r=>(!q||safe(Object.values(r).join(' ')).toLowerCase().includes(q))&&(!f||r.fiabilite===f)}; const cols=[['affixe','Affixe'],['chiens','Chiens','int'],['presentations','Prés.','int'],['resultats','Rés.','int'],['taux_resultat','Taux','pct'],['points','Pts','int'],['score_moyen_presentation','Score moy.','num'],['chiens_resultats','Chiens résultat','int'],['pct_chiens_resultats','% chiens','pct'],['haut_niveau','HN','int'],['disciplines_fortes','Disciplines fortes'],['chiens_leaders','Chiens leaders'],['fiabilite','Fiabilité']]; affTable=makeTable('affTable',DATA.affixes,cols,{sortKey:'indice_affixe',sortDir:-1,filter}); ['affSearch','affReliability'].forEach(id=>{const el=document.getElementById(id); ['input','change'].forEach(evt=>el.addEventListener(evt,()=>affTable.render()));}); const aff10=DATA.affixes.filter(a=>a.presentations>=10 && a.affixe!=='SANS_AFFIXE_DETECTE').sort((a,b)=>b.score_moyen_presentation-a.score_moyen_presentation); bars('affQualityBars',aff10,'affixe','score_moyen_presentation',15,v=>num(v)); const affRes=DATA.affixes.filter(a=>a.affixe!=='SANS_AFFIXE_DETECTE').sort((a,b)=>b.resultats-a.resultats); bars('affResultBars',affRes,'affixe','resultats',15)}
+function initAffTable(){optionize('affReliability','Toutes fiabilités',[...new Set(DATA.affixes.map(r=>r.fiabilite))].sort()); const filter=()=>{const q=safe(document.getElementById('affSearch').value).toLowerCase();const f=document.getElementById('affReliability').value;return r=>(!q||safe(Object.values(r).join(' ')).toLowerCase().includes(q))&&(!f||r.fiabilite===f)}; const cols=[['affixe','Affixe'],['chiens','Chiens','int'],['presentations','Prés.','int'],['resultats','Rés.','int'],['taux_resultat','Taux','pct'],['points','Pts','int'],['score_moyen_presentation','Score moy.','num'],['chiens_resultats','Chiens résultat','int'],['pct_chiens_resultats','% chiens','pct'],['haut_niveau','HN','int'],['disciplines_fortes','Disciplines fortes'],['chiens_leaders','Chiens leaders'],['fiabilite','Fiabilité']]; affTable=makeTable('affTable',DATA.affixes,cols,{sortKey:'indice_affixe',sortDir:-1,filter}); ['affSearch','affReliability'].forEach(id=>document.getElementById(id).addEventListener('input',()=>affTable.render())); const aff10=DATA.affixes.filter(a=>a.presentations>=10 && a.affixe!=='SANS_AFFIXE_DETECTE').sort((a,b)=>b.score_moyen_presentation-a.score_moyen_presentation); bars('affQualityBars',aff10,'affixe','score_moyen_presentation',15,v=>num(v)); const affRes=DATA.affixes.filter(a=>a.affixe!=='SANS_AFFIXE_DETECTE').sort((a,b)=>b.resultats-a.resultats); bars('affResultBars',affRes,'affixe','resultats',15)}
 function initDiscTables(){makeTable('discTable',DATA.disciplines,[['discipline','Discipline'],['presentations','Prés.','int'],['resultats','Rés.','int'],['taux_resultat','Taux','pct'],['points','Pts','int'],['score_moyen_presentation','Score moy.','num'],['chiens','Chiens','int'],['haut_niveau','HN','int'],['CACIT','CACIT','int'],['CACT','CACT','int'],['EXC','EXC','int']],{sortKey:'presentations'}); makeTable('catTable',DATA.categories,[['categorie','Catégorie'],['presentations','Prés.','int'],['resultats','Rés.','int'],['taux_resultat','Taux','pct'],['points','Pts','int'],['chiens','Chiens','int']],{sortKey:'presentations'}); makeTable('dogDiscTable',DATA.topDogDisciplines,[['nom_chien_affiche','Chien'],['affixe','Affixe'],['discipline_norm','Discipline'],['presentations','Prés.','int'],['resultats','Rés.','int'],['taux_resultat','Taux','pct'],['points','Pts','int'],['CACIT','CACIT','int'],['CACT','CACT','int'],['EXC','EXC','int']],{sortKey:'points'});}
-const YEAR_METRICS = {
-  presentations:{label:'Présentations', type:'int', description:'Volume annuel total de passages enregistrés.'},
-  resultats:{label:'Résultats', type:'int', description:'Nombre annuel de lignes ayant produit un résultat exploitable.'},
-  chiens:{label:'Chiens', type:'int', description:'Nombre annuel de chiens distincts observés dans la base.'},
-  points:{label:'Points', type:'int', description:'Total annuel de points standardisés.'},
-  taux_resultat:{label:'Taux de résultat', type:'pct', description:'Part des présentations donnant un résultat.'},
-  score_moyen_presentation:{label:'Score moyen / présentation', type:'num', description:'Rendement moyen annuel par présentation.'}
-};
-function metricFmt(metric, value){
-  if(metric==='taux_resultat') return pct(value);
-  if(YEAR_METRICS[metric]?.type==='num') return num(value);
-  return fmt.format(Math.round(+value||0));
-}
-function initYearControls(){
-  const primary=document.getElementById('yearMetric');
-  const secondary=document.getElementById('yearSecondary');
-  const mode=document.getElementById('yearMode');
-  if(!primary||!secondary||!mode) return;
-  const options=Object.entries(YEAR_METRICS).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
-  primary.innerHTML=options;
-  primary.value='presentations';
-  secondary.innerHTML='<option value="">Aucun indicateur secondaire</option>'+options;
-  secondary.value='taux_resultat';
-  [primary,secondary,mode].forEach(el=>['input','change'].forEach(evt=>el.addEventListener(evt,renderYearChart)));
-}
-function renderYearChart(){
-  const svg=document.getElementById('yearChart'), rows=DATA.years || [];
-  if(!svg || !rows.length) return;
-  const primary=document.getElementById('yearMetric')?.value || 'presentations';
-  const secondary=document.getElementById('yearSecondary')?.value || '';
-  const mode=document.getElementById('yearMode')?.value || 'bars';
-  const W=svg.clientWidth||600,H=330,p=44;
-  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
-  const maxPrimary=Math.max(...rows.map(r=>+r[primary]||0),1);
-  const maxSecondary=secondary?Math.max(...rows.map(r=>+r[secondary]||0),1):1;
-  const gap=(W-2*p)/rows.length;
-  const bw=gap*.62;
-  const xOf=(i)=>p+i*gap+gap/2;
-  const yOf=(value,max)=>H-p-((+value||0)/max)*(H-2*p);
-  let out=`<rect x="0" y="0" width="${W}" height="${H}" fill="#08110f"/><line x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}" stroke="#24433b"/><line x1="${p}" y1="${p}" x2="${p}" y2="${H-p}" stroke="#24433b"/>`;
-  out+=`<text x="${p}" y="22" fill="#f6d9a6" font-size="12" font-weight="700">${YEAR_METRICS[primary].label}</text>`;
-  if(secondary) out+=`<text x="${W-p}" y="22" fill="#7dd3bc" font-size="12" font-weight="700" text-anchor="end">${YEAR_METRICS[secondary].label}</text>`;
-  if(mode==='bars'){
-    rows.forEach((r,i)=>{
-      const x=xOf(i)-bw/2, y=yOf(r[primary],maxPrimary), h=H-p-y;
-      out+=`<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" fill="#d6a04d" opacity=".88"><title>${r.annee}: ${metricFmt(primary,r[primary])}</title></rect>`;
-    });
-  } else {
-    const pts=rows.map((r,i)=>`${xOf(i)},${yOf(r[primary],maxPrimary)}`).join(' ');
-    out+=`<polyline points="${pts}" fill="none" stroke="#d6a04d" stroke-width="3"/>`;
-    rows.forEach((r,i)=>out+=`<circle cx="${xOf(i)}" cy="${yOf(r[primary],maxPrimary)}" r="3.5" fill="#d6a04d"><title>${r.annee}: ${metricFmt(primary,r[primary])}</title></circle>`);
-  }
-  if(secondary){
-    const pts2=rows.map((r,i)=>`${xOf(i)},${yOf(r[secondary],maxSecondary)}`).join(' ');
-    out+=`<polyline points="${pts2}" fill="none" stroke="#7dd3bc" stroke-width="3" opacity=".95"/>`;
-    rows.forEach((r,i)=>out+=`<circle cx="${xOf(i)}" cy="${yOf(r[secondary],maxSecondary)}" r="3" fill="#7dd3bc"><title>${r.annee}: ${metricFmt(secondary,r[secondary])}</title></circle>`);
-  }
-  rows.forEach((r,i)=>{const x=xOf(i); out+=`<text x="${x}" y="${H-18}" fill="#9eb6ad" font-size="10" text-anchor="middle" transform="rotate(-45 ${x} ${H-18})">${r.annee}</text>`;});
-  const yTicks=4;
-  for(let t=0;t<=yTicks;t++){
-    const val=maxPrimary*t/yTicks, y=yOf(val,maxPrimary);
-    out+=`<line x1="${p-4}" y1="${y}" x2="${W-p}" y2="${y}" stroke="#24433b" opacity=".35"/><text x="${p-8}" y="${y+4}" fill="#9eb6ad" font-size="10" text-anchor="end">${metricFmt(primary,val)}</text>`;
-  }
-  svg.innerHTML=out;
-  const total=rows.reduce((s,r)=>s+(+r[primary]||0),0);
-  const avg=total/rows.length;
-  const best=rows.reduce((a,b)=>(+b[primary]||0)>(+a[primary]||0)?b:a,rows[0]);
-  const worst=rows.reduce((a,b)=>(+b[primary]||0)<(+a[primary]||0)?b:a,rows[0]);
-  const trend=(+rows[rows.length-1][primary]||0)-(+rows[0][primary]||0);
-  const stats=document.getElementById('yearStats');
-  if(stats) stats.innerHTML=[
-    ['Total',metricFmt(primary,total)],
-    ['Moyenne/an',metricFmt(primary,avg)],
-    ['Meilleure année',`${best.annee} · ${metricFmt(primary,best[primary])}`],
-    ['Écart début-fin',`${trend>=0?'+':''}${metricFmt(primary,trend)}`]
-  ].map(c=>`<div class="mini-kpi"><span class="small">${c[0]}</span><strong>${c[1]}</strong></div>`).join('');
-  const desc=document.getElementById('yearMetricDescription');
-  if(desc) desc.textContent=YEAR_METRICS[primary].description + (secondary?` Comparaison secondaire : ${YEAR_METRICS[secondary].label}.`:'');
-  const sub=document.getElementById('yearChartSubtitle');
-  if(sub) sub.textContent=`${YEAR_METRICS[primary].label}${secondary?' + '+YEAR_METRICS[secondary].label:''}`;
-  const lp=document.getElementById('yearLegendPrimary'); if(lp) lp.textContent=YEAR_METRICS[primary].label;
-  const ls=document.getElementById('yearLegendSecondary'); if(ls) ls.textContent=secondary?YEAR_METRICS[secondary].label:'Aucun secondaire';
-  const mini=document.getElementById('yearTableMini');
-  if(mini) mini.innerHTML='<table><thead><tr><th>Année</th><th>'+YEAR_METRICS[primary].label+'</th>'+(secondary?'<th>'+YEAR_METRICS[secondary].label+'</th>':'')+'</tr></thead><tbody>'+rows.map(r=>`<tr><td>${r.annee}</td><td class="num">${metricFmt(primary,r[primary])}</td>${secondary?`<td class="num">${metricFmt(secondary,r[secondary])}</td>`:''}</tr>`).join('')+'</tbody></table>';
-}
-function svgYear(){renderYearChart();}
+function svgYear(){const svg=document.getElementById('yearChart'), rows=DATA.years; const W=svg.clientWidth||600,H=330,p=42; svg.setAttribute('viewBox',`0 0 ${W} ${H}`); const max=Math.max(...rows.map(r=>r.presentations)); const rateMax=Math.max(...rows.map(r=>r.taux_resultat)); const bw=(W-2*p)/rows.length*.62; const gap=(W-2*p)/rows.length; let out=`<line x1="${p}" y1="${H-p}" x2="${W-p}" y2="${H-p}" stroke="#24433b"/><line x1="${p}" y1="${p}" x2="${p}" y2="${H-p}" stroke="#24433b"/>`; rows.forEach((r,i)=>{const x=p+i*gap+gap*.2; const bh=(r.presentations/max)*(H-2*p); const y=H-p-bh; out+=`<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="4" fill="#d6a04d" opacity=".86"><title>${r.annee}: ${fmt.format(r.presentations)} présentations, ${pct(r.taux_resultat)}</title></rect><text x="${x+bw/2}" y="${H-18}" fill="#9eb6ad" font-size="10" text-anchor="middle" transform="rotate(-45 ${x+bw/2} ${H-18})">${r.annee}</text>`}); let pts=rows.map((r,i)=>{const x=p+i*gap+gap*.2+bw/2; const y=H-p-(r.taux_resultat/rateMax)*(H-2*p); return `${x},${y}`}).join(' '); out+=`<polyline points="${pts}" fill="none" stroke="#7dd3bc" stroke-width="3"/>`; svg.innerHTML=out;}
 function dashboard(){bars('disciplineBars',DATA.disciplines,'discipline','presentations',10); bars('qualifBars',DATA.qualifs,'qualificatif','n',12); bars('topDogBars',DATA.dogs.slice(0,15),'nom_chien_affiche','indice_performance',15,v=>num(v)); svgYear(); const solids=DATA.dogs.filter(d=>['élite confirmée','performer régulier','profil efficace à surveiller'].includes(d.profil_statistique)).slice(0,12); document.getElementById('solidProfiles').innerHTML=solids.map((d,i)=>`<p><span class="rank">${i+1}.</span> <strong>${d.nom_chien_affiche}</strong> — ${d.presentations} prés., ${d.resultats} rés., ${pct(d.taux_resultat)}, ${d.haut_niveau} HN, ${d.discipline_forte}</p>`).join('')}
 function toCSV(rows){if(!rows.length)return ''; const cols=Object.keys(rows[0]); const esc=v=>'"'+safe(v).replaceAll('"','""')+'"'; return cols.join(';')+'\n'+rows.map(r=>cols.map(c=>esc(r[c])).join(';')).join('\n')}
-function downloadCSV(kind){const map={dogs:DATA.dogs,affixes:DATA.affixes,disciplines:DATA.disciplines,categories:DATA.categories,years:DATA.years,qualifs:DATA.qualifs}; const blob=new Blob([toCSV(map[kind]||[])],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`gescon_${kind}.csv`; a.click(); URL.revokeObjectURL(a.href)}
-initTabs(); kpis(); initYearControls(); dashboard(); initDogTable(); initAffTable(); initDiscTables(); window.addEventListener('resize',()=>svgYear());
+function downloadCSV(kind){const map={dogs:DATA.dogs,affixes:DATA.affixes,disciplines:DATA.disciplines,categories:DATA.categories}; const blob=new Blob([toCSV(map[kind])],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`gescon_${kind}.csv`; a.click(); URL.revokeObjectURL(a.href)}
+initTabs(); kpis(); dashboard(); initDogTable(); initAffTable(); initDiscTables(); window.addEventListener('resize',()=>svgYear());
 </script>
 </body>
 </html>
